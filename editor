@@ -1,0 +1,175 @@
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QLineEdit, QHBoxLayout, \
+    QRadioButton, QMessageBox, QGroupBox, QButtonGroup, QTextEdit, QListWidget, QFileDialog
+from PIL import Image, ImageOps, ImageFilter
+import os
+
+workdir = ""
+
+class Ui_MainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.move(100, 100)
+        self.resize(400, 300)
+        self.save_dir = 'Modified'
+        self.original_image = None
+
+        self.initUi()
+        self.n_list.currentRowChanged.connect(self.showChosenImage)
+
+
+    def initUi(self):
+        self.n_list = QListWidget()
+        self.n_text = QTextEdit()
+        self.t_list = QListWidget()
+
+        self.folder = QPushButton('Папка')
+        self.folder.clicked.connect(self.showFilenamesList)
+
+        self.lbl_image = QLabel("Картинка")
+        self.lbl_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_image.setStyleSheet("border: 1px solid gray")
+
+        self.move_left = QPushButton('Лево')
+        self.move_left.clicked.connect(self.do_left)
+
+        self.move_right = QPushButton('Право')
+        self.move_right.clicked.connect(self.do_right)
+
+        self.mirror = QPushButton('Зеркало')
+        self.mirror.clicked.connect(self.do_flip)
+
+        self.sharpness = QPushButton('Резкость')
+        self.sharpness.clicked.connect(self.do_sharp)
+
+        self.bw = QPushButton('Ч/Б')
+        self.bw.clicked.connect(self.do_bw)
+
+        self.save = QPushButton('Сохранить')
+        self.save.clicked.connect(self.saveImage)
+        
+        self.clear_filter = QPushButton("Очистить фильтр")
+        self.clear_filter.clicked.connect(self.resetImage)
+
+        left_layout = QVBoxLayout()
+        left_layout.addWidget(self.folder)
+        left_layout.addWidget(self.n_list)
+
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addWidget(self.move_left)
+        buttons_layout.addWidget(self.move_right)
+        buttons_layout.addWidget(self.mirror)
+        buttons_layout.addWidget(self.sharpness)
+        buttons_layout.addWidget(self.bw)
+        buttons_layout.addWidget(self.save)
+        buttons_layout.addWidget(self.clear_filter)
+
+        right_layout = QVBoxLayout()
+        right_layout.addWidget(self.lbl_image, stretch=4)
+        right_layout.addLayout(buttons_layout)
+
+        main_layout = QHBoxLayout()
+        main_layout.addLayout(left_layout, stretch=1)
+        main_layout.addLayout(right_layout, stretch=3)
+
+        self.setLayout(main_layout)
+
+    def chooseWorkDir(self):
+        self.workdir = QFileDialog.getExistingDirectory()
+
+    def filter(self, files, extensions):
+        result = []
+        for filename in files:
+            for ext in extensions:
+                if filename.endswith(ext):
+                    result.append(filename)
+        return result
+
+    def showFilenamesList(self):
+        self.chooseWorkDir()
+        extensions = ['.jpeg', '.jpg', '.png', '.bmp', '.gif']
+
+        if self.workdir:
+            files = os.listdir(self.workdir)
+            images = self.filter(files, extensions)
+
+            self.n_list.clear()
+            self.n_list.addItems(images)
+
+    def laodImage(self, filename):
+        self.filename = filename
+        image_path = os.path.join(self.workdir, filename)
+        self.image = Image.open(image_path)
+        self.original_image = self.image.copy()
+
+    def showImage(self, path):
+        pixapimage = QPixmap(path)
+        label_width = self.lbl_image.width()
+        label_height = self.lbl_image.height()
+
+        scaled_pixmap = pixapimage.scaled(label_width, label_height, Qt.AspectRatioMode.KeepAspectRatio)
+
+        self.lbl_image.setPixmap(scaled_pixmap)
+        self.lbl_image.setVisible(True)
+
+    def showChosenImage(self):
+        if self.n_list.currentRow() >= 0: 
+            filename = self.n_list.currentItem().text()
+            self.laodImage(filename)
+            image_path = os.path.join(self.workdir, filename)
+            self.showImage(image_path)
+
+    def do_bw(self):
+        if self.image:
+            self.image = self.image.convert('L')
+            self.saveImage()
+            image_path = os.path.join(self.workdir, self.save_dir, self.filename)
+            self.showImage(image_path)
+
+    def saveImage(self):
+        path = os.path.join(self.workdir, self.save_dir)
+        if not os.path.exists(path) or not os.path.isdir(path):
+            os.mkdir(path)
+        image_path = os.path.join(path, self.filename)
+        self.image.save(image_path)
+
+    def do_flip(self):
+        if self.image:
+            self.image = self.image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            self.saveImage()
+            image_path = os.path.join(self.workdir, self.save_dir, self.filename)
+            self.showImage(image_path)
+
+    def do_left(self):
+        if self.image:
+            self.image = self.image.rotate(90, expand=True)
+            self.saveImage()
+            image_path = os.path.join(self.workdir, self.save_dir, self.filename)
+            self.showImage(image_path)
+
+    def do_right(self):
+        if self.image:
+            self.image = self.image.rotate(270, expand=True)
+            self.saveImage()
+            image_path = os.path.join(self.workdir, self.save_dir, self.filename)
+            self.showImage(image_path)
+
+    def do_sharp(self):
+        if self.image:
+            self.image = self.image.filter(ImageFilter.SHARPEN)
+            self.saveImage()
+            image_path = os.path.join(self.workdir, self.save_dir, self.filename)
+            self.showImage(image_path)
+
+    def resetImage(self):
+        if self.original_image:
+            self.image = self.original_image.copy()
+            image_path = os.path.join(self.workdir, self.filename)
+            self.showImage(image_path)
+
+if __name__ == '__main__':
+    app = QApplication([])
+    window = Ui_MainWindow()
+    window.show()
+    app.exec()
